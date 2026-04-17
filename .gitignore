@@ -1,0 +1,44 @@
+brain.md
+
+# Build
+build/
+.gradle/
+bin/
+out/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# Minecraft
+run/
+
+# Config with API keys
+config/steve-common.toml
+run/config/steve-common.toml
+
+# Media files (large binaries)
+*.mp4
+*.mov
+*.avi
+*.webm
+
+# Structure files (if regenerable)
+*.nbt
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Misc
+*.log
+
+# JDK
+jdk-17.0.2.jdk/

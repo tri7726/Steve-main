@@ -1,0 +1,89 @@
+﻿To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.4/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :extractIncludeProto UP-TO-DATE
+> Task :extractProto UP-TO-DATE
+> Task :generateProto UP-TO-DATE
+
+> Task :compileJava
+.\gradlew : 
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\BuildStructureAction.java:350: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+At line:1 char:1
++ .\gradlew compileJava > build_err.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\Pheo\D...ked for removal:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+            ResourceLocation resourceLocation = new ResourceLocation("minecraft:" + blockName);
+                                                ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\CraftItemAction.java:61: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+            itemRL = new ResourceLocation(fullId);
+                     ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\FeedAnimalAction.java:202: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+            Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation("minecraft:" + name));
+                                                       ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\MineBlockAction.java:362: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+            Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation("minecraft:" + blockName));
+                                                          ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\GiveItemAction.java:196: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+            Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation("minecraft:" + name));
+                                                       ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\PlaceBlockAction.java:81: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation resourceLocation = new ResourceLocation(blockName);
+                                            ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\SmeltItemAction.java:57: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        try { inputRL = new ResourceLocation(fullId); }
+                        ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\action\actions\StripMineAction.java:84: 
+error: cannot find symbol
+        this.startPos = steve.blockPosition();
+            ^
+  symbol: variable startPos
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\client\ClientSetup.java:22: warning: 
+[removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+    private static final ResourceLocation STEVE_TEXTURE = new ResourceLocation("minecraft", 
+"textures/entity/player/wide/steve.png");
+                                                          ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\SteveMod.java:42: warning: [removal] get() in 
+FMLJavaModLoadingContext has been deprecated and marked for removal
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+                                                        ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\SteveMod.java:46: warning: [removal] get() in 
+ModLoadingContext has been deprecated and marked for removal
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SteveConfig.SPEC);
+                         ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\structure\StructureTemplateLoader.java:80: 
+warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+            ResourceLocation resourceLocation = new ResourceLocation(SteveMod.MODID, structureName);
+                                                ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\structure\StructureTemplateLoader.java:142: 
+warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+                ResourceLocation blockLocation = new ResourceLocation(blockName);
+                                                 ^
+C:\Users\Pheo\Downloads\Steve-main\Steve-main\src\main\java\com\steve\ai\util\ActionUtils.java:63: warning: [removal] 
+ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation resourceLocation = new ResourceLocation(blockName);
+                                            ^
+1 error
+13 warnings
+
+> Task :compileJava FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --info option to get more log output.
+> Run with --scan to get full insights.
+
+BUILD FAILED in 16s
+4 actionable tasks: 1 executed, 3 up-to-date

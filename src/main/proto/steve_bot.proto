@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.steve.ai.grpc";
+option java_outer_classname = "SteveBotProto";
+
+package steveai;
+
+/**
+ * Dịch vụ trung tâm điều khiển Steve AI.
+ * Hỗ trợ luồng dữ liệu hai chiều giữa Minecraft Client và Brain Server.
+ */
+service SteveAiService {
+    // Bidirectional Streaming channel: Gửi trạng thái bot và nhận lệnh điều khiển.
+    rpc StreamControl(stream BotState) returns (stream AiCommand);
+}
+
+/**
+ * Đại diện cho trạng thái toàn diện của Bot tại một thời điểm (Tick).
+ */
+message BotState {
+    // ID tick của thế giới Minecraft
+    int64 tick = 1;
+    
+    // --- VỊ TRÍ & SINH TỒN ---
+    double health = 2;   // Lượng máu (0-20)
+    double hunger = 3;   // Độ đói (0-20)
+    double x = 4;        // Tọa độ X
+    double y = 5;        // Tọa độ Y
+    double z = 6;        // Tọa độ Z
+    
+    // --- MÔI TRƯỜNG & VẬT PHẨM ---
+    string inventory_json = 7;       // Toàn bộ túi đồ (JSON format)
+    string nearby_entities_json = 8; // Thực thể xung quanh (JSON format)
+    string observations_json = 9;    // Các quan sát logic khác (JSON format)
+
+    // --- SOVEREIGN TELEMETRY (NÂNG CAO) ---
+    string biome = 16;      // Quần xã sinh vật hiện tại
+    string dimension = 17;  // Chiều không gian (overworld, the_nether, the_end)
+    int64 world_time = 18;  // Thời gian thế giới (in ticks)
+    bool is_raining = 19;   // Trạng thái thời tiết (Rain/Thunder)
+
+    // --- PHẢN HỒI HÀNH ĐỘNG (Dành cho CRITIC) ---
+    bool last_action_success = 10; // Hành động gần nhất có thành công?
+    string last_task = 11;         // Tên task vừa thực hiện
+    string last_error = 12;        // Lỗi (nếu có)
+    string executed_skill = 13;    // Skill/Code cụ thể đã chạy
+    double duration_seconds = 14;  // Thời gian thực thi
+
+    // --- VISION & MULTIMODAL ---
+    bytes screenshot = 15; // Dữ liệu hình ảnh thô cho Vision LLM
+}
+
+/**
+ * Lệnh thực thi được Brain gửi xuống cho Minecraft Bot.
+ */
+message AiCommand {
+    string command_id = 1;   // ID định danh lệnh
+    string command_type = 2; // Loại lệnh (ví dụ: "TASK", "SYSTEM", "STOP")
+    string payload_json = 3; // Tham số lệnh (JSON format)
+
+    // Cấu hình nâng cao (Sovereign Tier)
+    int32 priority = 4;                // Độ ưu tiên (cao hơn = chạy trước)
+    map<string, string> metadata = 5;  // Dữ liệu mở rộng dạng key-value
+}

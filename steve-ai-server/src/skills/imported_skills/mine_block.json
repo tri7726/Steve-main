@@ -1,0 +1,30 @@
+{
+  "id": "mine_block",
+  "name": "Mine Block",
+  "description": "Mine exactly one block of a specified type using pathfinding and the correct tool. Requires target_block parameter.",
+  "commands": [
+    {
+      "type": "MOVE_TO_BLOCK",
+      "payload": {
+        "target": "${payload.target_block}",
+        "distance": 3.0
+      }
+    },
+    {
+      "type": "EQUIP_BEST_TOOL",
+      "payload": {
+        "target": "${payload.target_block}"
+      }
+    },
+    {
+      "type": "MINE_BLOCK",
+      "payload": {
+        "target": "${payload.target_block}"
+      }
+    },
+    {
+      "type": "COLLECT_DROPS",
+      "payload": {}
+    }
+  ]
+}

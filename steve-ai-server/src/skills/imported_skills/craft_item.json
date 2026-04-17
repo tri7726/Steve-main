@@ -1,0 +1,20 @@
+{
+  "id": "craft_item",
+  "name": "Craft Item",
+  "description": "Crafts a specified item using a crafting table if required. Assumes ingredients are in inventory.",
+  "commands": [
+    {
+      "type": "ENSURE_CRAFTING_TABLE",
+      "payload": {
+         "required": "${payload.needs_table}"
+      }
+    },
+    {
+      "type": "CRAFT",
+      "payload": {
+        "recipe_result": "${payload.item_name}",
+        "count": 1
+      }
+    }
+  ]
+}

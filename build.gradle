@@ -1,0 +1,236 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'com.google.protobuf' version '0.9.4'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+version = '1.0.0'
+group = 'com.steve.ai'
+
+base {
+    archivesName = 'steve-ai-mod'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // Tắt các warning phiền phức từ code gRPC tự sinh
+    options.compilerArgs << '-Xlint:none'
+    options.compilerArgs << '-nowarn'
+    options.compilerArgs << '-Xlint:-serial'
+    options.compilerArgs << '-Xlint:-cast'
+    options.compilerArgs << '-Xlint:-rawtypes'
+}
+
+eclipse {
+    classpath {
+        file {
+            whenMerged { classpath ->
+                classpath.entries.removeAll { entry ->
+                    entry.kind == 'lib' && entry.path.toString().endsWith('.pom')
+                }
+
+                // Xóa entries cũ của generated proto nếu đã tồn tại (tránh duplicate)
+                classpath.entries.removeAll { entry ->
+                    entry instanceof org.gradle.plugins.ide.eclipse.model.SourceFolder &&
+                    (entry.path.contains('proto/main/java') || entry.path.contains('proto/main/grpc'))
+                }
+
+                // Thêm lại với ignore_optional_problems để tắt warnings trong IDE
+                def genProto = new org.gradle.plugins.ide.eclipse.model.SourceFolder('build/generated/source/proto/main/java', null)
+                genProto.entryAttributes['ignore_optional_problems'] = 'true'
+                genProto.entryAttributes['optional'] = 'true'
+                classpath.entries.add(genProto)
+
+                def genGrpc = new org.gradle.plugins.ide.eclipse.model.SourceFolder('build/generated/source/proto/main/grpc', null)
+                genGrpc.entryAttributes['ignore_optional_problems'] = 'true'
+                genGrpc.entryAttributes['optional'] = 'true'
+                classpath.entries.add(genGrpc)
+            }
+        }
+    }
+}
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                steve { source sourceSets.main }
+            }
+        }
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                steve { source sourceSets.main }
+            }
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+afterEvaluate {
+    sourceSets.main.java {
+        srcDirs += 'build/generated/source/proto/main/java'
+        srcDirs += 'build/generated/source/proto/main/grpc'
+    }
+    compileJava {
+        dependsOn generateProto
+        source += fileTree(dir: 'build/generated/source/proto/main/java')
+        source += fileTree(dir: 'build/generated/source/proto/main/grpc')
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.3"
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.65.1'
+        }
+    }
+    generateProtoTasks {
+        all().each { task ->
+            task.plugins {
+                grpc {}
+            }
+        }
+    }
+}
+
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
+
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.20'
+
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // GraalVM
+    implementation 'org.graalvm.polyglot:polyglot:23.1.0'
+    implementation 'org.graalvm.polyglot:js:23.1.0'
+
+    // Shade vào JAR (strip module-info để tránh conflict)
+    shade 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+    shade('io.github.resilience4j:resilience4j-circuitbreaker:2.1.0') { exclude group: 'org.slf4j' }
+    shade('io.github.resilience4j:resilience4j-retry:2.1.0')          { exclude group: 'org.slf4j' }
+    shade('io.github.resilience4j:resilience4j-ratelimiter:2.1.0')    { exclude group: 'org.slf4j' }
+    shade('io.github.resilience4j:resilience4j-bulkhead:2.1.0')       { exclude group: 'org.slf4j' }
+    shade 'com.google.protobuf:protobuf-java:3.25.1'
+
+    // Commons Codec - Forge đã có sẵn
+    implementation 'commons-codec:commons-codec:1.16.0'
+
+    // gRPC and Protobuf
+    implementation 'io.grpc:grpc-netty:1.65.1'
+    shade 'io.grpc:grpc-netty:1.65.1'
+    
+    implementation 'io.grpc:grpc-protobuf:1.65.1'
+    shade 'io.grpc:grpc-protobuf:1.65.1'
+    
+    implementation 'io.grpc:grpc-stub:1.65.1'
+    shade 'io.grpc:grpc-stub:1.65.1'
+    
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
+    testImplementation 'net.jqwik:jqwik:1.8.1'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+            'Specification-Title'    : 'Steve AI Mod',
+            'Specification-Vendor'   : 'Steve AI',
+            'Specification-Version'  : '1',
+            'Implementation-Title'   : project.name,
+            'Implementation-Version' : project.jar.archiveVersion,
+            'Implementation-Vendor'  : 'Steve AI'
+        ])
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    finalizedBy 'reobfJar'
+}
+
+shadowJar {
+    archiveClassifier = 'fat'
+    
+    // Explicitly include project classes and shade dependencies
+    from sourceSets.main.output
+    configurations = [project.configurations.shade]
+    
+    // EXCLUDE signatures to avoid SecurityException
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/*.INF'
+    // EXCLUDE packages that conflict with Java module system
+    // Forge/Minecraft đã cung cấp các thư viện Google này
+    exclude 'com/google/errorprone/**'
+    exclude 'com/google/j2objc/**'
+    exclude 'com/google/gson/**'
+    exclude 'com/google/thirdparty/**'
+    exclude 'com/google/api/**'
+    exclude 'com/google/auth/**'
+    exclude 'com/google/cloud/**'
+    exclude 'org/checkerframework/**'
+    exclude 'android/**'
+    exclude 'com/android/**'
+    exclude 'io/opencensus/**'
+    // Relocate còn lại (không conflict với Forge)
+    relocate 'com.google.protobuf', 'com.steve.ai.shadow.protobuf'
+    relocate 'com.google.common', 'com.steve.ai.shadow.common'
+    relocate 'io.grpc', 'com.steve.ai.shadow.grpc'
+    relocate 'io.netty', 'com.steve.ai.shadow.netty'
+    relocate 'io.perfmark', 'com.steve.ai.shadow.perfmark'
+    relocate 'javax.annotation', 'com.steve.ai.shadow.annotation'
+    relocate 'com.github.benmanes.caffeine', 'com.steve.ai.shadow.caffeine'
+
+    mergeServiceFiles()
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+reobf {
+    shadowJar {}
+}
+
+shadowJar.finalizedBy('reobfShadowJar')
+
+tasks.build.dependsOn shadowJar
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
