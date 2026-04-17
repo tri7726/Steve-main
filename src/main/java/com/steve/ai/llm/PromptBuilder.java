@@ -59,6 +59,27 @@ public class PromptBuilder {
             prompt.append("Waypoints:").append(wpSummary).append("\n");
         }
 
+        // Long-term memory: tìm bài học liên quan đến lệnh hiện tại
+        java.util.List<String> memories = steve.getMemory().searchLongTermMemory(command);
+        if (!memories.isEmpty()) {
+            prompt.append("=== LESSONS LEARNED ===\n");
+            int shown = 0;
+            for (String mem : memories) {
+                if (mem != null && !mem.isBlank()) {
+                    if (mem.contains("[LESSON]") || mem.contains("failed") || mem.contains("avoid")) {
+                        prompt.append("- ").append(mem, 0, Math.min(mem.length(), 120)).append("\n");
+                        if (++shown >= 3) break;
+                    }
+                }
+            }
+        }
+
+        // Recent actions context (3 actions gần nhất)
+        java.util.List<String> recent = steve.getMemory().getRecentActions(3);
+        if (!recent.isEmpty()) {
+            prompt.append("Recent:").append(String.join(" → ", recent)).append("\n");
+        }
+
         prompt.append("CMD:\"").append(command).append("\"\n");
         return prompt.toString();
     }

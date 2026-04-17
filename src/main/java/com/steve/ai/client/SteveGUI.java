@@ -207,47 +207,42 @@ public class SteveGUI {
             for (int i = messages.size() - 1; i >= 0; i--) {
                 ChatMessage msg = messages.get(i);
                 
-                int maxBubbleWidth = PANEL_WIDTH - (PANEL_PADDING * 3); // Leave space on sides
+                int maxBubbleWidth = PANEL_WIDTH - (PANEL_PADDING * 3);
                 String wrappedText = wrapText(mc.font, msg.text, maxBubbleWidth - 10);
-                int textWidth = mc.font.width(wrappedText);
-                int textHeight = MESSAGE_HEIGHT;
-                int bubbleWidth = Math.min(textWidth + 10, maxBubbleWidth);
-                int bubbleHeight = textHeight + 10;
-                
+                String[] lines = wrappedText.split("\n", -1);
+                int lineCount = lines.length;
+                int bubbleHeight = (MESSAGE_HEIGHT * lineCount) + 10;
+
+                // Tính bubble width theo dòng rộng nhất
+                int maxLineWidth = 0;
+                for (String l : lines) maxLineWidth = Math.max(maxLineWidth, mc.font.width(l));
+                int bubbleWidth = Math.min(maxLineWidth + 10, maxBubbleWidth);
+
                 int msgY = currentY - bubbleHeight + scrollOffset;
-                
+
                 if (msgY + bubbleHeight < messageAreaTop - 20 || msgY > messageAreaBottom + 20) {
-                    currentY -= bubbleHeight + 5;
+                    currentY -= bubbleHeight + 5 + 12;
                     continue;
                 }
-                
+
                 // Render message bubble based on sender
                 if (msg.isUser) {
                     int bubbleX = screenWidth - bubbleWidth - PANEL_PADDING - 5;
-                    
-                    // Draw bubble background with gradient for alpha support
                     graphics.fillGradient(bubbleX - 3, msgY - 3, bubbleX + bubbleWidth + 3, msgY + bubbleHeight, msg.bubbleColor, msg.bubbleColor);
-                    
-                    // Draw sender name (small, above bubble)
                     graphics.drawString(mc.font, "§7" + msg.sender, bubbleX, msgY - 12, 0xFFCCCCCC);
-                    
-                    // Draw message text (white on colored bubble)
-                    graphics.drawString(mc.font, wrappedText, bubbleX + 5, msgY + 5, 0xFFFFFFFF);
-                    
+                    for (int li = 0; li < lines.length; li++) {
+                        graphics.drawString(mc.font, lines[li], bubbleX + 5, msgY + 5 + li * MESSAGE_HEIGHT, 0xFFFFFFFF);
+                    }
                 } else {
                     int bubbleX = panelX + PANEL_PADDING;
-                    
-                    // Draw bubble background with gradient for alpha support
                     graphics.fillGradient(bubbleX - 3, msgY - 3, bubbleX + bubbleWidth + 3, msgY + bubbleHeight, msg.bubbleColor, msg.bubbleColor);
-                    
-                    // Draw sender name (small, above bubble)
                     graphics.drawString(mc.font, "§l" + msg.sender, bubbleX, msgY - 12, TEXT_COLOR);
-                    
-                    // Draw message text (white on colored bubble)
-                    graphics.drawString(mc.font, wrappedText, bubbleX + 5, msgY + 5, 0xFFFFFFFF);
+                    for (int li = 0; li < lines.length; li++) {
+                        graphics.drawString(mc.font, lines[li], bubbleX + 5, msgY + 5 + li * MESSAGE_HEIGHT, 0xFFFFFFFF);
+                    }
                 }
-                
-                currentY -= bubbleHeight + 5 + 12; // Extra space for sender name
+
+                currentY -= bubbleHeight + 5 + 12;
             }
         }
         
@@ -277,19 +272,45 @@ public class SteveGUI {
     }
 
     /**
-     * Simple word wrap for text
+     * Word wrap: tự xuống dòng theo từ, không cắt bỏ nội dung.
+     * Trả về chuỗi nhiều dòng phân cách bằng "\n".
      */
     private static String wrapText(net.minecraft.client.gui.Font font, String text, int maxWidth) {
-        if (font.width(text) <= maxWidth) {
-            return text;
-        }
-        // Simple truncation for now
+        if (text == null || text.isEmpty()) return "";
+        if (font.width(text) <= maxWidth) return text;
+
         StringBuilder result = new StringBuilder();
-        for (int i = 0; i < text.length(); i++) {
-            result.append(text.charAt(i));
-            if (font.width(result.toString() + "...") >= maxWidth) {
-                return result.substring(0, result.length() - 3) + "...";
+        String[] words = text.split(" ");
+        StringBuilder currentLine = new StringBuilder();
+
+        for (String word : words) {
+            String test = currentLine.length() == 0 ? word : currentLine + " " + word;
+            if (font.width(test) <= maxWidth) {
+                if (currentLine.length() > 0) currentLine.append(" ");
+                currentLine.append(word);
+            } else {
+                // Từ quá dài, buộc phải cắt ký tự
+                if (currentLine.length() == 0) {
+                    StringBuilder charBuf = new StringBuilder();
+                    for (char c : word.toCharArray()) {
+                        if (font.width(charBuf.toString() + c) > maxWidth) {
+                            if (result.length() > 0) result.append("\n");
+                            result.append(charBuf);
+                            charBuf.setLength(0);
+                        }
+                        charBuf.append(c);
+                    }
+                    currentLine = charBuf;
+                } else {
+                    if (result.length() > 0) result.append("\n");
+                    result.append(currentLine);
+                    currentLine = new StringBuilder(word);
+                }
             }
+        }
+        if (currentLine.length() > 0) {
+            if (result.length() > 0) result.append("\n");
+            result.append(currentLine);
         }
         return result.toString();
     }
