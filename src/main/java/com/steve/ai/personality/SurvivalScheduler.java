@@ -11,8 +11,11 @@ import com.steve.ai.grpc.AiCommand;
 import com.steve.ai.grpc.GrpcAiClient;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import net.minecraft.core.BlockPos;
+import java.lang.reflect.Type;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import net.minecraft.core.BlockPos;
 import java.util.Optional;
 
 /**
@@ -104,8 +107,17 @@ public class SurvivalScheduler {
             }
             entitiesJson.append("]");
 
-            // 3. Xử lý các lệnh gRPC đến từ Node.js
-            processIncomingGrpcCommands(steve, executor);
+            // 3. Xử lý các lệnh gRPC đến từ Node.js (Chỉ xử lý nếu không đang làm việc sinh tồn khẩn cấp)
+            boolean isDoingVitalSurvival = executor.isExecuting() && 
+                (executor.getCurrentTaskName().equals("gather") || 
+                 executor.getCurrentTaskName().equals("eat") ||
+                 (executor.getCurrentTaskName().equals("craft") && (steve.getSteveHunger() < 6)));
+
+            if (!isDoingVitalSurvival) {
+                processIncomingGrpcCommands(steve, executor);
+            } else {
+                SteveMod.LOGGER.debug("Steve '{}' skipping gRPC commands to focus on vitality", steve.getSteveName());
+            }
 
             // Update duration if a command was active
             if (lastActionStartTime > 0) {
@@ -1153,32 +1165,55 @@ public class SurvivalScheduler {
 
     /**
      * Nếu hunger ≤ 4 (2 tim đói) và không có đồ ăn trong túi → cần kiếm ăn khẩn cấp.
-     * Interrupt task hiện tại nếu cần.
+     * Interrupt task hiện tại nếu đó là task không phải sinh tồn.
      */
     private void checkCriticalHunger(SteveEntity steve, ActionExecutor executor) {
         if (hungerSearchCooldown > 0) return;
         
+        // Skip hunger logic in Peaceful mode
+        if (steve.level().getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL) return;
+
+        
+        int hunger = steve.getSteveHunger();
         int threshold = 4;
         String pType = steve.getPersonality().getType().name();
         if ("SERIOUS".equals(pType) || "CALM".equals(pType)) threshold = 6;
         else if ("BRAVE".equals(pType)) threshold = 3;
 
-        if (steve.getSteveHunger() > threshold) return;  // Chưa đói khẩn cấp
+        if (hunger > threshold) return;  // Chưa đói khẩn cấp
 
         // Kiểm tra còn đồ ăn không
         boolean hasFood = hasAnyFood(steve);
         if (hasFood) return; // autoEatIfHungry() sẽ xử lý
 
-        if (hungerSearchCooldown == 0) {
-            steve.sendChatMessage("Đói lã rồi! Phải kiếm đồ ăn ngay!");
-            // Enqueue gather food task (ưu tiên thấp — không interrupt task đang chạy)
-            if (!executor.isExecuting()) {
-                Task gatherFood = new Task("gather", Map.of("resource", "food", "quantity", 5));
-                executor.enqueue(gatherFood);
-                SteveMod.LOGGER.info("SurvivalScheduler: Steve '{}' queuing emergency food gather",
-                    steve.getSteveName());
+        // Desperate mode: Đói quá mà không có đồ ăn và cũng không tự kiếm được
+        if (hunger <= 2) {
+            net.minecraft.world.entity.player.Player nearest = steve.level().getNearestPlayer(steve, 16.0);
+            if (nearest != null) {
+                steve.getLookControl().setLookAt(nearest);
+                steve.sendChatMessage("Cái bụng biểu tình dữ quá, tao sắp chết đói rồi! " + nearest.getName().getString() + " ơi, cho tao tí đồ ăn cứu mạng với!");
+                hungerSearchCooldown = 400; // 20s nhắc lại nếu vẫn đói
+                return;
             }
-            hungerSearchCooldown = 600; // 30 giây cooldown
+        }
+
+        // Logic ngắt task: Chỉ ngắt nếu không đang làm việc liên quan đến thực phẩm
+        String currentTask = executor.isExecuting() ? executor.getCurrentTaskName() : "";
+        boolean isSolvingHunger = currentTask.equals("craft") || currentTask.equals("smelt") || currentTask.equals("eat") || currentTask.equals("gather") || currentTask.equals("hunt");
+
+        if (executor.isExecuting() && !isSolvingHunger) {
+            steve.sendChatMessage("Đói lã rồi! Bỏ hết việc đó đi, phải kiếm đồ ăn ngay!");
+            executor.stopCurrentAction();
+        }
+
+        if (!isSolvingHunger) {
+            Task gatherFood = new Task("gather", Map.of("resource", "food", "quantity", 8));
+            executor.enqueue(gatherFood);
+            
+            SteveMod.LOGGER.info("SurvivalScheduler: Steve '{}' interrupted current task for emergency food gather",
+                steve.getSteveName());
+            
+            hungerSearchCooldown = 1200; // 1 phút cooldown
         }
     }
 
@@ -1336,39 +1371,62 @@ public class SurvivalScheduler {
         String payload = cmd.getPayloadJson();
         Map<String, Object> params = GSON.fromJson(payload, new TypeToken<Map<String, Object>>(){}.getType());
 
-        this.lastCommandId = cmd.getCommandId();
-        this.lastCommandType = type;
-        this.lastCommandSuccess = true;
-        this.lastCommandError = "";
-        this.lastActionStartTime = System.currentTimeMillis();
-
         SteveMod.LOGGER.info("[Voyager-Bridge] Mapping command {} with params {}", type, payload);
 
+        // ── Parameter Legacy Mapping & Normalization ──────────────────────
+        // Đảm bảo item_id -> item, block_id -> block, count -> quantity cho tương thích
+        Map<String, Object> finalParams = new HashMap<>(params);
+        if (params.containsKey("item_id") && !params.containsKey("item")) finalParams.put("item", params.get("item_id"));
+        if (params.containsKey("block_id") && !params.containsKey("block")) finalParams.put("block", params.get("block_id"));
+        if (params.containsKey("count") && !params.containsKey("quantity")) finalParams.put("quantity", params.get("count"));
+        if (params.containsKey("action") && !params.containsKey("mode")) finalParams.put("mode", params.get("action"));
+        
         Task javaTask = null;
         switch (type) {
             case "MOVE_TO_BLOCK":
-                javaTask = new Task("pathfind", params);
+                javaTask = new Task("pathfind", finalParams);
                 break;
             case "MINE_BLOCK":
-                javaTask = new Task("mine", params);
+                javaTask = new Task("mine", finalParams);
                 break;
             case "PLACE_BLOCK":
-                javaTask = new Task("place", params);
+                javaTask = new Task("place", finalParams);
                 break;
             case "CRAFT":
-                javaTask = new Task("craft", params);
+                javaTask = new Task("craft", finalParams);
                 break;
             case "SMELT":
-                javaTask = new Task("smelt", params);
+                javaTask = new Task("smelt", finalParams);
                 break;
             case "FARM":
-                javaTask = new Task("farm", params);
+                javaTask = new Task("farm", finalParams);
                 break;
             case "ATTACK":
-                javaTask = new Task("attack", params);
+                javaTask = new Task("attack", finalParams);
                 break;
             case "GOTO_WAYPOINT":
                 javaTask = new Task("waypoint", Map.of("action", "goto", "label", params.getOrDefault("label", "home")));
+                break;
+            case "TRADE":
+                javaTask = new Task("trade", finalParams);
+                break;
+            case "FISH":
+                javaTask = new Task("fish", finalParams);
+                break;
+            case "INTERACT_CHEST":
+                javaTask = new Task("chest", finalParams);
+                break;
+            case "ENCHANT":
+                javaTask = new Task("enchant", finalParams);
+                break;
+            case "SMITH":
+                javaTask = new Task("smithing", finalParams);
+                break;
+            case "BREW":
+                javaTask = new Task("brew", finalParams);
+                break;
+            case "SLEEP":
+                javaTask = new Task("sleep", finalParams);
                 break;
             default:
                 SteveMod.LOGGER.warn("[Voyager-Bridge] Unknown command type: " + type);
@@ -1378,9 +1436,27 @@ public class SurvivalScheduler {
         }
 
         if (javaTask != null) {
+            // ── INTERRUPT GUARD ──────────────────────────────────────────
+            // Nếu Steve đang làm đúng việc này rồi (trùng action + trùng block/item), 
+            // thì không xóa queue để tránh phá hỏng chuỗi sub-tasks (chặt gỗ, craft bàn).
+            if (executor.isCurrentlyBusy() && executor.getCurrentTaskName().equals(javaTask.getAction())) {
+                java.util.Map<String, Object> currentParams = executor.getActiveActionParameters();
+                
+                String currentTarget = currentParams.getOrDefault("block", 
+                                      currentParams.getOrDefault("item", "none")).toString();
+                String newTarget = finalParams.getOrDefault("block", 
+                                  finalParams.getOrDefault("item", "none")).toString();
+                
+                if (currentTarget.equals(newTarget)) {
+                    SteveMod.LOGGER.debug("SurvivalScheduler: Ignoring redundant AI command for {}: {}", type, newTarget);
+                    return; 
+                }
+            }
+
             executor.stopCurrentAction();
             executor.enqueue(javaTask);
         }
+
     }
     /**
      * Tự động đi ngủ nếu trời tối và đang ở nơi an toàn.

@@ -66,9 +66,6 @@ public class ActionRegistry {
     private ActionRegistry() {
         this.factories = new ConcurrentHashMap<>();
         this.actionToPlugin = new ConcurrentHashMap<>();
-        
-        // Native Actions Auto-Registration
-        this.register("smart_strip_mine", (steve, task, context) -> new com.steve.ai.action.actions.StripMineAction(steve, task), 1, "core");
     }
 
     /**

@@ -145,7 +145,7 @@ public class CoreActionsPlugin implements ActionPlugin {
             priority, PLUGIN_ID);
 
         registry.register("archeology",
-            (steve, task, ctx) -> new FarmingAction(steve, task), // Reusing Farming for archeology as it scans
+            (steve, task, ctx) -> new ArcheologyAction(steve, task),
             priority, PLUGIN_ID);
         
         registry.register("chat",

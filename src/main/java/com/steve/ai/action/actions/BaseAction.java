@@ -16,6 +16,10 @@ public abstract class BaseAction {
         this.task = task;
     }
 
+    public Task getTask() {
+        return task;
+    }
+
     public void start() {
         if (started) return;
         started = true;

@@ -1,0 +1,30 @@
+ {
+  "mining": {
+    "diamond": "Diamonds spawn below Y=16, but are most abundant at Y=-58. Avoid mining at Y=-64 as it is mostly bedrock. Watch out for Warden in Deep Dark biomes.",
+    "ancient_debris": "Found in the Nether between Y=8 and Y=22, most common at Y=15. Use beds or TNT to blast mine safely.",
+    "iron": "Most common at Y=16 in mountains or Y=232, but also found at all levels.",
+    "gold": "Abundant in Badlands biomes at any level. In other biomes, found below Y=32."
+  },
+  "mobs": {
+    "zombie_villager": "To cure: Throw a Splash Potion of Weakness, then feed a Golden Apple. Wait about 3-5 minutes. Useful for getting better trade discounts.",
+    "warden": "Extremely dangerous. Spawns in Ancient Cities when Sculk Shriekers are activated 4 times. Best strategy: Avoid or use wool to dampen sounds.",
+    "enderman": "Do not look at their eyes. Use a 2-block high ceiling to stay safe and attack feet. Weak to water.",
+    "piglin": "Wear at least one piece of gold armor to stay neutral. Love gold ingots for trading (bartering)."
+  },
+  "survival": {
+    "nether_portal": "Can be built without a diamond pickaxe using lava pools and water buckets to cast obsidian in place.",
+    "villager_trading": "Librarians provide Enchanted Books (Mending is best). Farmers buy crops for emeralds. Fletchers buy sticks for emeralds.",
+    "breath_underwater": "Use doors (Java Edition) or magma blocks (crouch to avoid damage) for air pockets. Respiration enchantment helps.",
+    "raid": "Triggered by entering a village with the Bad Omen effect. Gives Hero of the Village buff upon victory, yielding huge trade discounts."
+  },
+  "dimensions": {
+    "nether": "Bring gold armor. Do not sleep in beds (they explode). Use cobble for structures as ghasts cannot break it.",
+    "end": "Bring blocks and ender pearls. Destroy crystals on towers first. Stay away from edges."
+  },
+  "technical": {
+    "trading": "Villagers with specific jobs offer valuable items. Fletchers trade sticks for emeralds. Librarians offer Enchanted Books like Mending. Cure zombie villagers to lower prices.",
+    "smithing": "Use a Smithing Table to upgrade Diamond gear to Netherite using a Netherite Template and a Netherite Ingot. Templates are found in Bastion Remnants.",
+    "enchanting": "Requires an Enchanting Table and Lapis Lazuli. Surround the table with 15 bookshelves to unlock Level 30 enchantments. Priority: Fortune III, Mending, Sharpness V.",
+    "brewing": "Start with Awkward Potions (Nether Wart + Water Bottle). Add Blaze Powder as fuel. Use Magma Cream for Fire Resistance, Sugar for Speed, and Glistering Melon for Healing."
+  }
+}

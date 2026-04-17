@@ -25,7 +25,7 @@ public class MineBlockAction extends BaseAction {
     private int ticksRunning;
     private int ticksMovingToTarget;
     private int ticksSinceLastMine = 0;
-    private long lastPrereqMsgTick = 0;
+    private static long lastPrereqMsgTick = 0;
     private static final int MAX_TICKS = 24000;
     private static final int MINING_DELAY = 5;
     private static final int MOVE_TIMEOUT = 100; // ticks to reach a target before giving up
@@ -59,8 +59,8 @@ public class MineBlockAction extends BaseAction {
                 steve.getSteveName(), blockType, prereq.reason());
 
             long currentTick = steve.level().getGameTime();
-            if (currentTick - lastPrereqMsgTick > 2400) {
-                steve.sendChatMessage("Cần crafting trước: " + prereq.reason());
+            if (currentTick - lastPrereqMsgTick > 600) { // Giảm xuống 30 giây để vẫn nhắc nhưng không spam
+                steve.sendChatMessage("Cần chuẩn bị trước: " + prereq.reason());
                 lastPrereqMsgTick = currentTick;
             }
 
@@ -69,10 +69,12 @@ public class MineBlockAction extends BaseAction {
             executor.enqueue(new com.steve.ai.action.Task("gather", java.util.Map.of("resource", "wood")));
             executor.enqueue(new com.steve.ai.action.Task("craft",  java.util.Map.of("item", "crafting_table", "quantity", 1)));
             prereq.requiredTasks().forEach(executor::enqueue);
+            
             // Re-enqueue mine task sau khi có tool
             executor.enqueue(task);
 
-            result = ActionResult.failure("Missing tool: " + prereq.reason());
+            // Report failure but WITHOUT requiring replanning (internal queue will solve it)
+            result = new com.steve.ai.action.ActionResult(false, "Đang chuẩn bị công cụ: " + prereq.reason(), false);
             return;
         }
 

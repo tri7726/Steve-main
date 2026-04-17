@@ -28,7 +28,7 @@ public class HuntingAction extends BaseAction {
     private Animal targetEntity;
     private int ticksRunning;
     private int ticksSinceLastKill = 0;
-    private static final int MAX_TICKS = 12000;
+    private static final int MAX_TICKS = 1200; // 1 minute timeout for hunting
     private static final int SEARCH_RADIUS = 48;
 
     public HuntingAction(SteveEntity steve, Task task) {

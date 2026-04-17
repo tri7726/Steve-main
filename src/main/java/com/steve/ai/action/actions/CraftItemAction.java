@@ -110,23 +110,21 @@ public class CraftItemAction extends BaseAction {
                         // Enqueue lại craft task sau khi có nguyên liệu
                         steve.getActionExecutor().enqueue(task);
 
-                        result = ActionResult.success("Enqueued missing dependencies for " + missingName);
+                        // Report status but don't trigger AI re-plan
+                        result = new ActionResult(false, "Đang chuẩn bị nguyên liệu: " + missingName, false);
                         return;
                     }
                 } catch (Throwable t) {
-                    SteveMod.LOGGER.error("CRITICAL: ResourceDependencyResolver failed to load or execute", t);
-                    steve.sendChatMessage("Não tao bị lỗi nạp class (Dependency)! Không biết kiếm " + missingName + " kiểu gì.");
-                    result = ActionResult.failure("DependencyResolution error: " + t.getMessage());
+                    SteveMod.LOGGER.error("CRITICAL: ResourceDependencyResolver failed", t);
+                    result = new ActionResult(false, "Lỗi phân giải nguyên liệu: " + t.getMessage(), false);
                     return;
                 }
 
-                result = ActionResult.failure(
-                    "Thieu nguyen lieu: " + entry.getValue() + "x " + missingName
-                    + " de craft " + quantity + "x " + itemName);
-                steve.sendChatMessage("Tui thieu " + entry.getValue() + "x " + missingName + " roi!");
+                result = new ActionResult(false, "Thiếu nguyên liệu: " + missingName, false);
                 return;
             }
         }
+
 
         // Trừ nguyên liệu
         for (Map.Entry<net.minecraft.world.item.Item, Integer> entry : needed.entrySet()) {

@@ -2,6 +2,7 @@ package com.steve.ai.action;
 
 import com.steve.ai.SteveMod;
 import com.steve.ai.action.actions.*;
+import com.steve.ai.action.Task;
 import com.steve.ai.di.ServiceContainer;
 import com.steve.ai.di.SimpleServiceContainer;
 import com.steve.ai.event.EventBus;
@@ -277,6 +278,18 @@ public class ActionExecutor {
         }
     }
 
+    public String getCurrentTaskName() {
+        if (activeActions.isEmpty()) return "none";
+        BaseAction first = activeActions.get(0);
+        return first.getTask().getAction();
+    }
+
+    public java.util.Map<String, Object> getActiveActionParameters() {
+        if (activeActions.isEmpty()) return java.util.Collections.emptyMap();
+        return activeActions.get(0).getTask().getParameters();
+    }
+
+
     public void tick() {
         ticksSinceLastAction++;
 
@@ -530,47 +543,11 @@ public class ActionExecutor {
             }
         }
 
-        // Fallback to legacy switch statement for backward compatibility
-        SteveMod.LOGGER.debug("Using legacy fallback for action: {}", actionType);
-        return createActionLegacy(task);
+        SteveMod.LOGGER.warn("Unknown or unregistered action type: {}", actionType);
+        return null;
     }
 
-    /**
-     * Legacy action creation using switch statement.
-     *
-     * <p>Kept for backward compatibility during migration to plugin system.
-     * Will be removed in a future version once all actions are registered
-     * via plugins.</p>
-     *
-     * @param task Task containing action type and parameters
-     * @return Created action, or null if unknown
-     * @deprecated Use ActionRegistry instead
-     */
-    @Deprecated
-    private BaseAction createActionLegacy(Task task) {
-        return switch (task.getAction()) {
-            case "pathfind" -> new PathfindAction(steve, task);
-            case "mine"     -> new MineBlockAction(steve, task);
-            case "place"    -> new PlaceBlockAction(steve, task);
-            case "craft"    -> new CraftItemAction(steve, task);
-            case "smelt"    -> new SmeltItemAction(steve, task);
-            case "farm"     -> new FarmingAction(steve, task);
-            case "chest"    -> new ChestAction(steve, task);
-            case "attack"   -> new CombatAction(steve, task);
-            case "follow"   -> new FollowPlayerAction(steve, task);
-            case "gather"   -> new GatherResourceAction(steve, task);
-            case "build"    -> new BuildStructureAction(steve, task);
-            case "trade"    -> new TradeAction(steve, task);
-            case "sleep"    -> new SleepAction(steve, task);
-            case "fish"     -> new FishingAction(steve, task);
-            case "brew"     -> new BrewingAction(steve, task);
-            case "waypoint" -> new WaypointAction(steve, task);
-            default -> {
-                SteveMod.LOGGER.warn("Unknown action type: {}", task.getAction());
-                yield null;
-            }
-        };
-    }
+
 
     public void stopCurrentAction() {
         for (BaseAction action : activeActions) {
@@ -591,20 +568,29 @@ public class ActionExecutor {
 
     /** Enqueue a single task for execution. */
     public void enqueue(Task task) {
-        // Prevent spamming the same task consecutively (detect loops)
-        if (!taskQueue.isEmpty()) {
-            Task lastTask = null;
-            if (taskQueue instanceof LinkedList<Task>) {
-                lastTask = ((LinkedList<Task>) taskQueue).getLast();
-            }
-            if (lastTask != null && lastTask.getAction().equals(task.getAction()) 
-                    && lastTask.getParameters().equals(task.getParameters())) {
-                SteveMod.LOGGER.debug("ActionExecutor: Skipping duplicate task enqueue for {}", task.getAction());
+        // ── QUEUE INTELLIGENCE ──────────────────────────────────────────
+        // Quét toàn bộ queue để tìm task trùng lặp (trùng action + params).
+        // Tránh việc bị "ép" thêm hàng chục task "chặt gỗ" nếu MineBlock liên tục loop.
+        for (Task pending : taskQueue) {
+            if (pending.getAction().equals(task.getAction()) && 
+                pending.getParameters().equals(task.getParameters())) {
+                SteveMod.LOGGER.debug("ActionExecutor: Skipping redundant task in queue: {}", task.getAction());
                 return;
             }
         }
+        
+        // Cũng kiểm tra xem có đang thực hiện action này không
+        for (BaseAction active : activeActions) {
+            if (active.getTask().getAction().equals(task.getAction()) &&
+                active.getTask().getParameters().equals(task.getParameters())) {
+                SteveMod.LOGGER.debug("ActionExecutor: Already executing this task, skipping enqueue: {}", task.getAction());
+                return;
+            }
+        }
+
         taskQueue.add(task);
     }
+
 
     /** Clear all pending tasks from the queue. */
     public void clearQueue() {
