@@ -112,7 +112,10 @@ export class VoyagerAgent {
             // Nếu vừa execute xong 1 action, cho Critic chấm điểm
             if (this.isExecutingTask && obs.lastTask !== "") {
                 const isSuccess = await this.critic.evaluateAction(obs);
-                this.isExecutingTask = false; // reset
+                // Ghi nhớ kết quả vào ExperienceMemory để Curriculum học
+                const memEntry = `Task: ${obs.lastTask} | Result: ${isSuccess ? 'SUCCESS' : 'FAILURE'} | Inventory: ${JSON.stringify(obs.inventory).slice(0, 100)}`;
+                this.memory.add(memEntry);
+                this.isExecutingTask = false;
             }
 
             // Nếu đang rảnh rỗi, kêu Curriculum bốc việc mới
@@ -145,7 +148,7 @@ export class VoyagerAgent {
                         );
                         
                         if (synthesized) {
-                            await this.skills.loadAllSkills(); // Tải lại thư viện để refresh RAM
+                            this.skills.saveSkill(synthesized); // Persist vào library
                             chosenSkill = this.skills.getSkill(nextTask);
                         } else {
                             console.error(`[Voyager] Skill Generation failed for: ${nextTask}. Dropping task.`);

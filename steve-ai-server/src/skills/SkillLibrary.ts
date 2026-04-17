@@ -50,6 +50,20 @@ export class SkillLibrary {
         return this.skills.get(id);
     }
 
+    public saveSkill(skill: Skill): void {
+        this.skills.set(skill.id, skill);
+        const filePath = path.join(this.skillFolder, `${skill.id}.json`);
+        if (!fs.existsSync(this.skillFolder)) {
+            fs.mkdirSync(this.skillFolder, { recursive: true });
+        }
+        fs.writeFileSync(filePath, JSON.stringify(skill, null, 2));
+        console.log(`[SkillLibrary] Saved skill: ${skill.id}`);
+    }
+
+    public listSkillIds(): string[] {
+        return Array.from(this.skills.keys());
+    }
+
     public getAllSkillsDescription(): string {
         let desc = 'Available Skills:\n';
         for (const skill of this.skills.values()) {

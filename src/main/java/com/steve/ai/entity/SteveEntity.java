@@ -55,6 +55,14 @@ public class SteveEntity extends PathfinderMob {
     private final com.steve.ai.minigame.MiniGameManager miniGameManager = new com.steve.ai.minigame.MiniGameManager();
     private final com.steve.ai.behavior.QualityOfLifeManager qolManager = new com.steve.ai.behavior.QualityOfLifeManager();
 
+    // ── gRPC Hybrid Brain ─────────────────────────────────────────────────────
+    private com.steve.ai.grpc.GrpcAiClient grpcClient = null;
+    private boolean grpcEnabled = false;
+    private int grpcSendInterval = 40; // Gửi BotState mỗi 40 ticks (2 giây)
+    private String lastCompletedTask = "";
+    private String lastTaskError = "";
+    private boolean lastTaskSuccess = true;
+
     public SteveEntity(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
         this.steveName = "Steve";
@@ -203,6 +211,15 @@ public class SteveEntity extends PathfinderMob {
             if (tickCounter % 40 == 0) {
                 qolManager.tick(this, actionExecutor);
             }
+
+            // ── gRPC Hybrid Brain (mỗi grpcSendInterval ticks) ───────────────
+            if (grpcEnabled && tickCounter % grpcSendInterval == 0) {
+                tickGrpcBrain();
+            }
+            // Poll commands từ Node.js mỗi tick (không block)
+            if (grpcEnabled) {
+                pollGrpcCommands();
+            }
         }
     }
 
@@ -241,6 +258,140 @@ public class SteveEntity extends PathfinderMob {
 
     public ActionExecutor getActionExecutor() {
         return this.actionExecutor;
+    }
+
+    // ── gRPC Hybrid Brain methods ─────────────────────────────────────────────
+
+    /** Bật gRPC brain — gọi sau khi spawn Steve */
+    public void enableGrpcBrain() {
+        if (grpcEnabled) return;
+        try {
+            grpcClient = com.steve.ai.grpc.GrpcAiClient.getInstance();
+            grpcClient.start();
+            grpcEnabled = true;
+            SteveMod.LOGGER.info("[gRPC] Hybrid brain enabled for Steve '{}'", steveName);
+            sendChatMessage("🧠 Hybrid brain connected!");
+        } catch (Exception e) {
+            SteveMod.LOGGER.warn("[gRPC] Failed to enable hybrid brain: {}", e.getMessage());
+        }
+    }
+
+    public void disableGrpcBrain() {
+        grpcEnabled = false;
+        SteveMod.LOGGER.info("[gRPC] Hybrid brain disabled for Steve '{}'", steveName);
+    }
+
+    public boolean isGrpcEnabled() { return grpcEnabled; }
+
+    /** Gửi BotState snapshot lên Node.js brain */
+    private void tickGrpcBrain() {
+        if (grpcClient == null || !grpcClient.isConnected()) return;
+
+        try {
+            // Build inventory JSON
+            java.util.List<String> invSummary = memory.getInventory().getSummary();
+            String invJson = new com.google.gson.Gson().toJson(invSummary);
+
+            // Build nearby entities JSON
+            net.minecraft.world.phys.AABB box = this.getBoundingBox().inflate(16);
+            java.util.List<String> entities = this.level().getEntities(this, box).stream()
+                .filter(e -> e instanceof net.minecraft.world.entity.LivingEntity)
+                .map(e -> e.getType().toShortString() + "@" + (int) e.distanceTo(this) + "m")
+                .toList();
+            String entitiesJson = new com.google.gson.Gson().toJson(entities);
+
+            // Build observations JSON
+            com.steve.ai.llm.AgentObservation obs = com.steve.ai.llm.AgentObservation.capture(this, lastCompletedTask);
+            java.util.Map<String, Object> obsMap = java.util.Map.of(
+                "nearbyBlocks", obs.nearbyBlocks,
+                "biome", obs.biome,
+                "lightLevel", obs.lightLevel
+            );
+            String obsJson = new com.google.gson.Gson().toJson(obsMap);
+
+            // Biome & dimension
+            String biome = obs.biome;
+            String dimension = this.level().dimension().location().getPath();
+            long worldTime = this.level().getDayTime();
+            boolean isRaining = this.level().isRaining();
+
+            grpcClient.sendBotState(
+                tickCounter, this.getHealth(), steveHunger,
+                this.getX(), this.getY(), this.getZ(),
+                invJson, entitiesJson, obsJson,
+                lastTaskSuccess, lastCompletedTask, lastTaskError,
+                "", 0.0, null,
+                biome, dimension, worldTime, isRaining
+            );
+        } catch (Exception e) {
+            SteveMod.LOGGER.warn("[gRPC] Failed to send BotState: {}", e.getMessage());
+        }
+    }
+
+    /** Poll commands từ Node.js và enqueue vào ActionExecutor */
+    private void pollGrpcCommands() {
+        if (grpcClient == null || !grpcClient.hasCommands()) return;
+
+        com.steve.ai.grpc.AiCommand cmd;
+        while ((cmd = grpcClient.pollCommand()) != null) {
+            handleGrpcCommand(cmd);
+        }
+    }
+
+    private void handleGrpcCommand(com.steve.ai.grpc.AiCommand cmd) {
+        String type = cmd.getCommandType();
+        String payloadJson = cmd.getPayloadJson();
+        SteveMod.LOGGER.info("[gRPC] Received command: type={} payload={}", type, payloadJson);
+
+        try {
+            com.google.gson.JsonObject payload = payloadJson != null && !payloadJson.isBlank()
+                ? com.google.gson.JsonParser.parseString(payloadJson).getAsJsonObject()
+                : new com.google.gson.JsonObject();
+
+            // Map command_type → Task action
+            String action = switch (type.toUpperCase()) {
+                case "MINE_BLOCK"    -> "mine";
+                case "CRAFT"         -> "craft";
+                case "MOVE_TO_BLOCK" -> "pathfind";
+                case "ATTACK"        -> "attack";
+                case "GATHER"        -> "gather";
+                case "SMELT"         -> "smelt";
+                case "PLACE_BLOCK"   -> "place";
+                case "SLEEP"         -> "sleep";
+                case "FOLLOW"        -> "follow";
+                case "STOP"          -> { actionExecutor.stopCurrentAction(); yield null; }
+                default              -> {
+                    SteveMod.LOGGER.warn("[gRPC] Unknown command type: {}", type);
+                    yield null;
+                }
+            };
+
+            if (action == null) return;
+
+            // Build Task params từ payload JSON
+            java.util.Map<String, Object> params = new java.util.HashMap<>();
+            for (var entry : payload.entrySet()) {
+                var val = entry.getValue();
+                if (val.isJsonPrimitive()) {
+                    var prim = val.getAsJsonPrimitive();
+                    if (prim.isNumber()) params.put(entry.getKey(), prim.getAsNumber());
+                    else params.put(entry.getKey(), prim.getAsString());
+                }
+            }
+
+            actionExecutor.enqueue(new com.steve.ai.action.Task(action, params));
+            SteveMod.LOGGER.info("[gRPC] Enqueued task: {} with params {}", action, params);
+
+        } catch (Exception e) {
+            SteveMod.LOGGER.error("[gRPC] Failed to handle command {}: {}", type, e.getMessage());
+        }
+    }
+
+    /** Gọi từ ActionExecutor khi action hoàn thành — cập nhật feedback cho Critic */
+    public void reportTaskResult(String taskDesc, boolean success, String error) {
+        this.lastCompletedTask = taskDesc;
+        this.lastTaskSuccess = success;
+        this.lastTaskError = error != null ? error : "";
     }
 
     // ── Gameplay module getters ───────────────────────────────────────────────

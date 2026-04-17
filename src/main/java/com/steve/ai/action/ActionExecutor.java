@@ -374,6 +374,10 @@ public class ActionExecutor {
                 
                 steve.getMemory().addAction(action.getDescription());
                 lastCompletedActionDesc = action.getDescription() + " → " + result.getMessage();
+
+                // Báo kết quả cho gRPC Hybrid Brain (Critic feedback)
+                steve.reportTaskResult(action.getDescription(), result.isSuccess(),
+                    result.isSuccess() ? null : result.getMessage());
                 
                 if (!result.isSuccess() && result.requiresReplanning()) {
                     if (SteveConfig.ENABLE_CHAT_RESPONSES.get()) {

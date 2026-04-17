@@ -1,0 +1,11 @@
+{
+    "id": "mine_wood",
+    "name": "Mine Wood",
+    "description": "Find and mine oak logs nearby. Prerequisite for all crafting.",
+    "commands": [
+        {
+            "type": "GATHER",
+            "payload": { "resource": "wood" }
+        }
+    ]
+}

@@ -1,0 +1,27 @@
+{
+    "id": "get_wood_to_pickaxe",
+    "name": "Get Wood to Wooden Pickaxe",
+    "description": "Full chain: gather wood → craft planks → craft crafting table → craft wooden pickaxe. First tool in Minecraft progression.",
+    "commands": [
+        {
+            "type": "GATHER",
+            "payload": { "resource": "wood" }
+        },
+        {
+            "type": "CRAFT",
+            "payload": { "item": "oak_planks", "quantity": 4 }
+        },
+        {
+            "type": "CRAFT",
+            "payload": { "item": "crafting_table", "quantity": 1 }
+        },
+        {
+            "type": "CRAFT",
+            "payload": { "item": "stick", "quantity": 4 }
+        },
+        {
+            "type": "CRAFT",
+            "payload": { "item": "wooden_pickaxe", "quantity": 1 }
+        }
+    ]
+}

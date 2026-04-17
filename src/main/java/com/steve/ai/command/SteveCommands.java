@@ -66,6 +66,10 @@ public class SteveCommands {
             .then(Commands.literal("cobuild")
                 .then(Commands.argument("structure", StringArgumentType.string())
                     .executes(SteveCommands::coBuild)))
+            .then(Commands.literal("brain")
+                .then(Commands.argument("name", StringArgumentType.string())
+                    .then(Commands.argument("toggle", StringArgumentType.string())
+                        .executes(SteveCommands::toggleBrain))))
         );
     }
 
@@ -252,6 +256,24 @@ public class SteveCommands {
             source.sendSuccess(() -> Component.literal(name + " assigned role: " + role), true);
         } catch (IllegalArgumentException e) {
             source.sendFailure(Component.literal("Invalid role. Use: TANK, DPS, SUPPORT, BUILDER"));
+        }
+        return 1;
+    }
+
+    private static int toggleBrain(CommandContext<CommandSourceStack> context) {
+        String name   = StringArgumentType.getString(context, "name");
+        String toggle = StringArgumentType.getString(context, "toggle").toLowerCase();
+        CommandSourceStack source = context.getSource();
+
+        SteveEntity steve = SteveMod.getSteveManager().getSteve(name);
+        if (steve == null) { source.sendFailure(Component.literal("Steve not found: " + name)); return 0; }
+
+        if (toggle.equals("on")) {
+            steve.enableGrpcBrain();
+            source.sendSuccess(() -> Component.literal("🧠 Hybrid brain ON for " + name + " (connecting to Node.js:50051)"), true);
+        } else {
+            steve.disableGrpcBrain();
+            source.sendSuccess(() -> Component.literal("🧠 Hybrid brain OFF for " + name), true);
         }
         return 1;
     }
