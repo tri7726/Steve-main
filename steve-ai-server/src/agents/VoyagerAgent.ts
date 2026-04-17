@@ -57,7 +57,7 @@ export class VoyagerAgent {
         this.memory = new ExperienceMemory();
         this.curriculum = new Curriculum(this.llm, this.memory);
         this.critic = new Critic(this.llm);
-        this.skillGenerator = new SkillGenerator(this.llm);
+        this.skillGenerator = new SkillGenerator(this.llm, this.skills);
     }
     
     public async initialize() {
@@ -112,9 +112,32 @@ export class VoyagerAgent {
             // Nếu vừa execute xong 1 action, cho Critic chấm điểm
             if (this.isExecutingTask && obs.lastTask !== "") {
                 const isSuccess = await this.critic.evaluateAction(obs);
-                // Ghi nhớ kết quả vào ExperienceMemory để Curriculum học
                 const memEntry = `Task: ${obs.lastTask} | Result: ${isSuccess ? 'SUCCESS' : 'FAILURE'} | Inventory: ${JSON.stringify(obs.inventory).slice(0, 100)}`;
                 this.memory.add(memEntry);
+
+                if (obs.executedSkill) {
+                    this.skills.recordResult(obs.executedSkill, isSuccess);
+                }
+
+                // ── Self-critique loop: nếu fail → regenerate với feedback ──
+                if (!isSuccess && obs.lastError && obs.lastError.trim() !== '') {
+                    console.log(`[Voyager] Task '${obs.lastTask}' FAILED. Running self-critique...`);
+                    try {
+                        const critique = await this.buildCritiquePrompt(obs);
+                        const improved = await withTimeout(
+                            this.skillGenerator.generateSkillWithCritique(obs.lastTask, critique),
+                            30_000
+                        );
+                        if (improved) {
+                            this.skills.saveSkill(improved);
+                            console.log(`[Voyager] Regenerated skill '${obs.lastTask}' after critique.`);
+                            this.memory.add(`[LESSON] Task ${obs.lastTask} failed: ${obs.lastError}. Regenerated skill.`);
+                        }
+                    } catch (e) {
+                        console.error('[Voyager] Self-critique failed:', e);
+                    }
+                }
+
                 this.isExecutingTask = false;
             }
 
@@ -189,6 +212,34 @@ export class VoyagerAgent {
                     this.isExecutingTask = false;
                 }
             }
+        }
+    }
+
+    /**
+     * Build critique prompt từ failed observation để feed vào SkillGenerator.
+     */
+    private async buildCritiquePrompt(obs: BotObservation): Promise<string> {
+        const critiquePrompt = `You are the Critic Agent of a Minecraft bot.
+The bot just FAILED a task. Analyze the failure and provide specific feedback.
+
+Failed Task: ${obs.lastTask}
+Error: ${obs.lastError}
+Bot State at failure:
+- Health: ${obs.health}/20, Hunger: ${obs.hunger}/20
+- Inventory: ${JSON.stringify(obs.inventory).slice(0, 200)}
+- Biome: ${obs.biome}, Time: ${obs.worldTime}
+
+Provide a SHORT critique (2-3 sentences) explaining:
+1. Why the task likely failed
+2. What the skill should do differently
+3. Any missing prerequisites
+
+Output ONLY the critique text, no JSON.`;
+
+        try {
+            return await this.llm.chat(critiquePrompt);
+        } catch {
+            return `Task ${obs.lastTask} failed with error: ${obs.lastError}. Regenerate with better error handling.`;
         }
     }
 }

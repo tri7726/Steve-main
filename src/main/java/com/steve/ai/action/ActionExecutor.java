@@ -664,6 +664,11 @@ public class ActionExecutor {
         return isPlanning;
     }
 
+    /** True khi Steve đang thực thi action hoặc đang plan — dùng để tắt idle chat */
+    public boolean isCurrentlyBusy() {
+        return isPlanning || isAgentEvaluating || !activeActions.isEmpty() || !taskQueue.isEmpty();
+    }
+
     // ── Proactive Behaviors ────────────────────────────────────────────────────
 
     /**

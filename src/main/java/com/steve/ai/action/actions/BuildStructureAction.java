@@ -131,6 +131,7 @@ public class BuildStructureAction extends BaseAction {
         }
         
         if (groundPos == null) {
+            steve.sendChatMessage("❌ Không tìm được chỗ bằng phẳng để xây " + structureType + "!");
             result = ActionResult.failure("Cannot find suitable ground for building in your field of view");
             return;
         }
@@ -149,7 +150,27 @@ public class BuildStructureAction extends BaseAction {
         }
         
         if (buildPlan == null || buildPlan.isEmpty()) {
+            steve.sendChatMessage("❌ Không biết cách xây '" + structureType + "'. Thử: house, shelter, tower, barn.");
             result = ActionResult.failure("Cannot generate build plan for: " + structureType);
+            return;
+        }
+
+        // ── Prerequisite check: có đủ tool để xây không? ─────────────────────
+        // Xây cần stone → cần pickaxe. Tự resolve nếu thiếu.
+        var inv = steve.getMemory().getInventory();
+        boolean hasPick = inv.hasItem(net.minecraft.world.item.Items.WOODEN_PICKAXE, 1)
+                       || inv.hasItem(net.minecraft.world.item.Items.STONE_PICKAXE, 1)
+                       || inv.hasItem(net.minecraft.world.item.Items.IRON_PICKAXE, 1)
+                       || inv.hasItem(net.minecraft.world.item.Items.DIAMOND_PICKAXE, 1);
+        if (!hasPick) {
+            steve.sendChatMessage("🪓 Cần cuốc để xây! Để tao đi kiếm gỗ và craft trước...");
+            var executor = steve.getActionExecutor();
+            // Full chain: gather wood → craft table → craft pickaxe → build lại
+            java.util.List<Task> prereqs = com.steve.ai.action.ResourceDependencyResolver.resolve(
+                steve, net.minecraft.world.item.Items.WOODEN_PICKAXE, 1);
+            prereqs.forEach(executor::enqueue);
+            executor.enqueue(task); // Re-enqueue build task sau khi có tool
+            result = ActionResult.failure("Missing pickaxe, queued prerequisite chain");
             return;
         }
         
@@ -265,7 +286,8 @@ public class BuildStructureAction extends BaseAction {
                     collaborativeBuild.participatingSteves.size());
             }
         } else {
-            steve.setFlying(false); // Disable flying on error
+            steve.setFlying(false);
+            steve.sendChatMessage("❌ Lỗi hệ thống xây dựng, thử lại sau.");
             result = ActionResult.failure("Build system error: not in collaborative mode");
         }
     }

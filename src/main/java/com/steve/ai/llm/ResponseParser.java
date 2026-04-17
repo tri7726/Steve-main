@@ -117,6 +117,17 @@ public class ResponseParser {
             }
         }
         // --- Alias Mapping (Auto Override "Từ Lóng") ---
+        // Normalize action aliases trước
+        action = switch (action.toLowerCase()) {
+            case "rebuild", "reconstruct", "xây lại", "xay lai" -> "build";
+            case "dig", "excavate", "khai thác" -> "mine";
+            case "make", "create", "tạo", "làm" -> "craft";
+            case "go", "walk", "di chuyển", "đi đến" -> "pathfind";
+            case "kill", "fight", "chiến đấu", "đánh" -> "attack";
+            case "follow me", "theo tao", "đi theo" -> "follow";
+            default -> action.toLowerCase();
+        };
+
         if ("mine".equalsIgnoreCase(action) && parameters.containsKey("block")) {
             Object blockObj = parameters.get("block");
             if (blockObj instanceof String) {
